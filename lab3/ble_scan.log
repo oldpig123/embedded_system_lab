@@ -1,0 +1,179 @@
+Discovered 55:BC:76:C0:99:14
+Discovered 4E:96:27:00:91:B9
+Discovered 00:4E:22:06:5C:A8
+Discovered 4C:4B:CC:03:05:5D
+Discovered 30:24:B4:C2:E3:65
+Discovered 5A:72:B1:30:2D:65
+Discovered 01:E2:85:6F:EC:3F
+Discovered 4A:B1:06:7B:6A:4F
+Discovered 42:9A:F1:76:07:48
+Discovered 5C:97:84:EF:30:99
+Discovered 61:4E:89:78:30:35
+Discovered 09:F4:EF:78:67:07
+Discovered 6E:8E:43:1D:39:35
+Discovered 64:68:70:3F:E2:D5 - 'EDIFIER BLE'
+Discovered 5B:79:42:C4:E7:E7
+Discovered 17:BA:E4:D3:16:99
+Discovered 69:7F:9A:DD:30:9F
+Discovered 40:00:00:89:32:8D
+Discovered 64:D7:9F:47:C4:EE
+Discovered 45:A5:70:D8:0A:34
+Discovered 5A:A9:29:8C:E6:09
+Discovered 5B:E5:97:40:4D:EB
+Discovered 7A:7F:84:A8:4D:3B - '5J4AG7-Find My'
+Discovered 5E:68:CC:68:F2:47
+Discovered 4C:E5:F4:C5:A8:7D
+Discovered EE:E9:37:F8:BC:C8
+Discovered 43:B3:7F:D5:DD:F6
+Discovered 42:BF:E7:A1:BF:86
+Discovered 72:46:85:3D:1F:A1 - 'IOED_KNOT'
+Discovered 67:9F:49:EA:04:15
+Discovered 46:5E:77:29:1E:D0
+Discovered 79:19:EA:1F:31:81
+Discovered 4E:84:F3:7B:A9:03
+Discovered 43:E5:EC:3F:5D:25
+Discovered EC:91:83:BC:06:B8
+Discovered CD:9A:A8:87:85:A3
+Discovered 42:3F:4D:7A:DF:54
+Discovered 65:67:02:AC:C6:C2
+Discovered 42:27:D9:06:91:8E
+Discovered 56:18:D6:AC:52:36
+Discovered 7F:A7:A5:98:DB:42
+Discovered 7A:A7:A0:2F:1C:5F
+Discovered 22:73:2B:81:21:15
+Discovered 4D:50:44:87:9E:24
+Discovered 79:BB:06:45:11:F7
+Scan completed
+------------START 55:BC:76:C0:99:14 ---------------
+gattlib_ble_scan: Device connected error (device:/org/bluez/hci0/dev_55_BC_76_C0_99_14): GDBus.Error:org.bluez.Error.Failed: le-connection-abort-by-local
+gattlib_ble_scan: Gattlib connection not initialized.
+gattlib_ble_scan: Fail to discover primary services.
+gattlib_ble_scan: Cannot disconnect - connection parameter is not valid.
+gattlib_ble_scan: Failed to connect to the bluetooth device '55:BC:76:C0:99:14'
+------------DONE 55:BC:76:C0:99:14 ---------------
+------------START 4E:96:27:00:91:B9 ---------------
+------------DONE 4E:96:27:00:91:B9 ---------------
+------------START 00:4E:22:06:5C:A8 ---------------
+gattlib_ble_scan: Device connected error (device:/org/bluez/hci0/dev_00_4E_22_06_5C_A8): Timeout was reached
+gattlib_ble_scan: Gattlib connection not initialized.
+gattlib_ble_scan: Fail to discover primary services.
+gattlib_ble_scan: Cannot disconnect - connection parameter is not valid.
+gattlib_ble_scan: Failed to connect to the bluetooth device '00:4E:22:06:5C:A8'
+------------DONE 00:4E:22:06:5C:A8 ---------------
+------------START 4C:4B:CC:03:05:5D ---------------
+------------DONE 4C:4B:CC:03:05:5D ---------------
+------------START 30:24:B4:C2:E3:65 ---------------
+------------DONE 30:24:B4:C2:E3:65 ---------------
+------------START 5A:72:B1:30:2D:65 ---------------
+service[0] start_handle:0f end_handle:10 uuid:d0611e78-bbb4-4591-a5f8-487910ae4366
+service[1] start_handle:06 end_handle:07 uuid:0x1801
+service[2] start_handle:0a end_handle:0d uuid:0x180a
+service[3] start_handle:14 end_handle:15 uuid:9fa480e0-4967-4542-9390-d343dc5d04ae
+service[4] start_handle:01 end_handle:04 uuid:0x1800
+gattlib_ble_scan: Device '5A:72:B1:30:2D:65' cannot be found (97, 41)
+gattlib_ble_scan: Gattlib connection not initialized.
+gattlib_ble_scan: Fail to discover primary services.
+gattlib_ble_scan: Cannot disconnect - connection parameter is not valid.
+gattlib_ble_scan: Failed to connect to the bluetooth device '5A:72:B1:30:2D:65'
+------------DONE 5A:72:B1:30:2D:65 ---------------
+------------START 01:E2:85:6F:EC:3F ---------------
+characteristic[0] properties:18 value_handle:0010 uuid:8667556c-9a37-4c91-84ed-54ee27d90049
+characteristic[1] properties:20 value_handle:0007 uuid:0x2a05
+characteristic[2] properties:02 value_handle:000b uuid:0x2a29
+characteristic[3] properties:02 value_handle:000d uuid:0x2a24
+characteristic[4] properties:18 value_handle:0015 uuid:af0badb1-5b99-43cd-917a-a77bc549e3cc
+characteristic[5] properties:02 value_handle:0004 uuid:0x2a01
+characteristic[6] properties:02 value_handle:0002 uuid:0x2a00
+gattlib_ble_scan: Device connected error (device:/org/bluez/hci0/dev_01_E2_85_6F_EC_3F): GDBus.Error:org.bluez.Error.Failed: le-connection-abort-by-local
+gattlib_ble_scan: Gattlib connection not initialized.
+gattlib_ble_scan: Fail to discover primary services.
+gattlib_ble_scan: Cannot disconnect - connection parameter is not valid.
+gattlib_ble_scan: Failed to connect to the bluetooth device '01:E2:85:6F:EC:3F'
+------------DONE 01:E2:85:6F:EC:3F ---------------
+------------START 4A:B1:06:7B:6A:4F ---------------
+------------DONE 4A:B1:06:7B:6A:4F ---------------
+------------START 42:9A:F1:76:07:48 ---------------
+------------DONE 42:9A:F1:76:07:48 ---------------
+------------START 5C:97:84:EF:30:99 ---------------
+service[0] start_handle:15 end_handle:37 uuid:0x184c
+service[1] start_handle:12 end_handle:13 uuid:0x180a
+service[2] start_handle:5d end_handle:64 uuid:3e1d50cd-7e3e-427d-8e1c-b78aa87fe624
+service[3] start_handle:3a end_handle:58 uuid:0x1849
+service[4] start_handle:5a end_handle:5b uuid:0x1855
+service[5] start_handle:0a end_handle:10 uuid:0x1801
+service[6] start_handle:01 end_handle:08 uuid:0x1800
+service[7] start_handle:67 end_handle:68 uuid:0xfff0
+------------DONE 5C:97:84:EF:30:99 ---------------
+------------START 61:4E:89:78:30:35 ---------------
+characteristic[0] properties:02 value_handle:0019 uuid:0x2bb4
+characteristic[1] properties:12 value_handle:001e uuid:0x2bb6
+characteristic[2] properties:12 value_handle:0016 uuid:0x2bb3
+characteristic[3] properties:12 value_handle:0037 uuid:0x2bc2
+characteristic[4] properties:12 value_handle:001b uuid:0x2bb5
+characteristic[5] properties:12 value_handle:0034 uuid:0x2bc1
+characteristic[6] properties:10 value_handle:0031 uuid:0x2bc0
+characteristic[7] properties:12 value_handle:0029 uuid:0x2bbd
+characteristic[8] properties:02 value_handle:002f uuid:0x2bbf
+characteristic[9] properties:12 value_handle:0026 uuid:0x2bbb
+characteristic[10] properties:1c value_handle:002c uuid:0x2bbe
+characteristic[11] properties:02 value_handle:0024 uuid:0x2bba
+characteristic[12] properties:12 value_handle:0021 uuid:0x2bb9
+characteristic[13] properties:02 value_handle:0013 uuid:0x2a50
+characteristic[14] properties:08 value_handle:0064 uuid:edfd450e-2619-4d82-a9c4-90e8bc6e5878
+characteristic[15] properties:02 value_handle:0061 uuid:ac4f797f-ca34-49d0-9d84-f5c4b0c9a756
+characteristic[16] properties:02 value_handle:005e uuid:30d3137e-ed18-4715-9f83-ca06a152204f
+characteristic[17] properties:12 value_handle:003b uuid:0x2b93
+characteristic[18] properties:12 value_handle:0055 uuid:0x2ba5
+characteristic[19] properties:1c value_handle:0052 uuid:0x2ba4
+characteristic[20] properties:12 value_handle:004f uuid:0x2ba3
+characteristic[21] properties:1e value_handle:0047 uuid:0x2b99
+characteristic[22] properties:02 value_handle:004d uuid:0x2ba2
+characteristic[23] properties:12 value_handle:0044 uuid:0x2b98
+characteristic[24] properties:1e value_handle:004a uuid:0x2ba1
+characteristic[25] properties:12 value_handle:0041 uuid:0x2b97
+characteristic[26] properties:10 value_handle:003e uuid:0x2b96
+characteristic[27] properties:02 value_handle:0058 uuid:0x2bba
+characteristic[28] properties:02 value_handle:005b uuid:0x2b51
+characteristic[29] properties:02 value_handle:0010 uuid:0x2b2a
+characteristic[30] properties:0a value_handle:000e uuid:0x2b29
+characteristic[31] properties:20 value_handle:000b uuid:0x2a05
+characteristic[32] properties:02 value_handle:0008 uuid:0x2aa6
+characteristic[33] properties:02 value_handle:0006 uuid:0x2a04
+characteristic[34] properties:02 value_handle:0004 uuid:0x2a01
+characteristic[35] properties:02 value_handle:0002 uuid:0x2a00
+characteristic[36] properties:20 value_handle:0068 uuid:0xfff1
+gattlib_ble_scan: Device connected error (device:/org/bluez/hci0/dev_61_4E_89_78_30_35): GDBus.Error:org.bluez.Error.Failed: le-connection-abort-by-local
+gattlib_ble_scan: Gattlib connection not initialized.
+gattlib_ble_scan: Fail to discover primary services.
+gattlib_ble_scan: Cannot disconnect - connection parameter is not valid.
+gattlib_ble_scan: Failed to connect to the bluetooth device '61:4E:89:78:30:35'
+------------DONE 61:4E:89:78:30:35 ---------------
+------------START 09:F4:EF:78:67:07 ---------------
+service[0] start_handle:a6 end_handle:aa uuid:0xfef3
+service[1] start_handle:01 end_handle:02 uuid:0x1801
+service[2] start_handle:14 end_handle:17 uuid:0x1800
+service[3] start_handle:ac end_handle:ad uuid:0xfcf1
+gattlib_ble_scan: Device connected error (device:/org/bluez/hci0/dev_09_F4_EF_78_67_07): Timeout was reached
+gattlib_ble_scan: Gattlib connection not initialized.
+gattlib_ble_scan: Fail to discover primary services.
+gattlib_ble_scan: Cannot disconnect - connection parameter is not valid.
+gattlib_ble_scan: Failed to connect to the bluetooth device '09:F4:EF:78:67:07'
+------------DONE 09:F4:EF:78:67:07 ---------------
+------------START 6E:8E:43:1D:39:35 ---------------
+------------DONE 6E:8E:43:1D:39:35 ---------------
+------------START 64:68:70:3F:E2:D5 ---------------
+characteristic[0] properties:08 value_handle:00aa uuid:00000100-0004-1000-8000-001a11000101
+characteristic[1] properties:20 value_handle:00a7 uuid:00000100-0004-1000-8000-001a11000102
+characteristic[2] properties:20 value_handle:0002 uuid:0x2a05
+characteristic[3] properties:02 value_handle:0017 uuid:0x2a01
+characteristic[4] properties:02 value_handle:0015 uuid:0x2a00
+characteristic[5] properties:28 value_handle:00ad uuid:fe2c1237-8366-4814-8eb0-01de32100bea
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service0014'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service002d'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service000f'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service0006'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service000a'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service0001'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service0023'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service001d'.
+gattlib_ble_scan: Failed to get service property '/org/bluez/hci0/dev_4A_B1_06_7B_6A_4F/service0019'.

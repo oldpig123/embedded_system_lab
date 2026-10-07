@@ -1,0 +1,367 @@
+% Embedded Systems lab report -- compile with pdflatex (twice, for the ToC)
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{lmodern}      % scalable Type1 fonts for T1; without this,
+\usepackage[T1]{fontenc}  % MiKTeX builds slow, fuzzy METAFONT bitmaps
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% --- Listing styles --------------------------------------------------------
+\definecolor{codegray}{gray}{0.96}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0}
+\definecolor{codeblue}{rgb}{0.0,0.0,0.6}
+
+\lstdefinestyle{pystyle}{
+  language=Python,
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{codegreen}\itshape,
+  stringstyle=\color{red!70!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=8pt,
+  breaklines=true,
+  frame=single,
+  framerule=0pt,
+  showstringspaces=false,
+  tabsize=4,
+  captionpos=b,
+}
+\lstdefinestyle{shellstyle}{
+  language=bash,
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  framerule=0pt,
+  showstringspaces=false,
+  captionpos=b,
+}
+\lstset{style=pystyle}
+
+% --- Title ----------------------------------------------------------------
+\newcommand{\studentid}{R12942157}
+
+\title{Embedded Systems Laboratory Report\\
+       \large BLE Central Programming with a Raspberry Pi\\
+       \normalsize Basic Problem and Option Problem 1}
+\author{YU-CHEN, CHU\\
+        \normalsize Student ID: \studentid}
+\date{\today\\[2ex]
+      \normalsize Source code:
+      \url{https://github.com/oldpig123/embedded_system/tree/master/lab3}}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% =========================================================================
+\section{Introduction}
+
+This exercise is about the client side of Bluetooth Low Energy (BLE). A
+Raspberry Pi acts as a BLE \emph{central}, which in GATT terms is the
+\emph{client}, and connects to a \emph{peripheral}, the GATT \emph{server}.
+The task is to change the value of a Client Characteristic Configuration
+Descriptor (CCCD) on the server from the Python program running on the Pi.
+
+The CCCD (UUID \texttt{0x2902}) is the mechanism by which a client controls
+which server-initiated packets it receives for a given characteristic. A
+server may send a notification only if the client has written \texttt{0x0001}
+to the CCCD, and an indication only if it has written \texttt{0x0002}. The
+value is a 16-bit little-endian integer, so the byte sequence actually sent
+over the air for \texttt{0x0002} is \texttt{02 00}. This byte order is an easy
+mistake to make and is called out again in the implementation section.
+
+The report covers the basic problem (a Python central that writes
+\texttt{0x0002} to a CCCD) and the optional problem (building the C library
+GATTLIB on the Pi and trying its examples).
+
+% =========================================================================
+\section{Environment}
+
+Two machines are involved. The Raspberry Pi is the device under test and runs
+the central. A Windows laptop stands in for the phone and runs a small GATT
+server (see Section~\ref{sec:deviation} for why).
+
+\begin{table}[h]
+\centering
+\caption{Software and hardware used.}
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & Raspberry Pi (central) & Windows laptop (peripheral) \\
+\midrule
+OS            & Debian 13 (``trixie'')           & Windows 11 \\
+Bluetooth     & Pi onboard adapter (\texttt{hci0}) & Qualcomm FastConnect 7800 \\
+BLE stack     & BlueZ 5.82                       & Windows WinRT GATT API \\
+Language      & Python 3.13, C (gcc 14.2)        & Python 3.14 (managed by \texttt{uv}) \\
+Libraries     & \texttt{bluepy} 1.3.0, GATTLIB    & \texttt{winrt-*} 3.2.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Raspberry Pi setup}
+
+The lecture notes install \texttt{bluepy} with \texttt{sudo pip install}. On
+Debian 13 this is refused with \texttt{error: externally-managed-environment}
+(PEP~668): the distribution prevents \texttt{pip} from writing into the system
+Python so that it cannot break OS packages. The fix is a virtual environment:
+
+\begin{lstlisting}[style=shellstyle,caption={Installing bluepy on Debian 13.}]
+sudo apt install python3-pip libglib2.0-dev
+python3 -m venv ~/blenv
+~/blenv/bin/pip install bluepy
+sudo ~/blenv/bin/python central.py      # root is needed for BLE scanning
+\end{lstlisting}
+
+Because the program must run as root, \texttt{sudo} has to be given the
+virtual environment's interpreter explicitly. A plain \texttt{sudo python}
+would use the system Python, in which \texttt{bluepy} is not installed.
+
+% =========================================================================
+\section{Basic Problem: CCCD Write from a Python Central}
+\label{sec:basic}
+
+\subsection{Design}
+
+The program follows the scan--connect--write sequence of the lecture notes:
+
+\begin{enumerate}
+  \item Scan for 8 seconds and select the peripheral that advertises service
+        \texttt{0xFFF0}.
+  \item Connect to it.
+  \item Find characteristic \texttt{0xFFF1} and, from it, its CCCD
+        (\texttt{0x2902}).
+  \item Write the two bytes \texttt{02 00} (the value \texttt{0x0002}) with a
+        write \emph{request}, so that the server's response, or its error, is
+        observed.
+  \item Read the descriptor back and print it, then disconnect in a
+        \texttt{finally} block so that the link is released even if a step
+        fails.
+\end{enumerate}
+
+\subsection{Selecting the peripheral}
+
+An unfiltered scan in a normal room returned about 70 devices, so the target
+must be identified by content rather than by position in the list. The
+peripheral's address is not usable for this: it is a \emph{random} address and
+\emph{changes} from one advertising session to the next (the same laptop
+appeared under several different addresses across runs). The program therefore
+matches on the advertised service UUID and then uses whatever address that
+entry carries, passing the address type \texttt{'random'} to
+\texttt{Peripheral}. Without the address type, \texttt{bluepy} fails with
+``connection refused (111)'', as noted in the lecture slides.
+
+Two details of the advertisement matter. First, \texttt{getValueText()}
+returns \texttt{None} for entries that lack the requested field, which is true
+of most devices in a busy room, so the \texttt{None} case must be skipped
+before the substring test. Second, the target UUID was found under AD type~3
+(complete list of 16-bit service UUIDs), not AD type~7 (128-bit), because the
+\texttt{0xFFF0} UUID is a 16-bit short form of the Bluetooth base UUID. A first
+attempt that looked only at type~7 found nothing even though the device was
+being received.
+
+\subsection{Implementation}
+
+\lstinputlisting[caption={\texttt{central.py}: BLE central running on the Raspberry Pi.}]{../central.py}
+
+The CCCD is located through the \emph{characteristic} object
+(\texttt{char.getDescriptors(forUUID=0x2902)}), not through the peripheral:
+\texttt{Peripheral.getDescriptors} takes a handle range and has no
+\texttt{forUUID} argument. The value is written as \verb|b"\x02\x00"|; the bytes \texttt{00 02} would instead set the value
+to \texttt{0x0200}.
+
+\subsection{The peripheral used for testing}
+\label{sec:deviation}
+
+The assignment suggests an Android phone running BLE Tool or a BLE scanner
+app. Installing an app on the phone was not desired, so the peripheral role was
+instead played by the Windows laptop. Its Bluetooth adapter was confirmed to
+support the BLE peripheral role (\texttt{IsPeripheralRoleSupported = True}
+through the WinRT \texttt{BluetoothAdapter} API). A short Python program,
+\texttt{server.py}, advertises service \texttt{0xFFF0} containing one
+\emph{indicate-only} characteristic \texttt{0xFFF1}, and prints a timestamped
+line whenever a client's subscription changes.
+
+\lstinputlisting[caption={\texttt{server.py}: GATT server on the laptop, standing in for the phone.}]{../server.py}
+
+The characteristic is deliberately indicate-only, so that the only valid CCCD
+value is \texttt{0x0002}.
+
+The choice of library was not the first one. The popular \texttt{bless}
+package was tried first, but version 0.2.6 does not work on current Windows: it
+imports the obsolete \texttt{bleak\_winrt} module, requires a
+\texttt{pysetupdi} package that is not on PyPI, and, to set the device name, edits the adapter's
+registry entry. The server was therefore written directly
+against the WinRT \texttt{GattServiceProvider} classes, which needs only a few
+calls.
+
+\paragraph{A limitation of this peripheral.} On Windows the operating system
+owns the CCCD. Unlike the Android BLE Tool, whose server log shows the raw
+descriptor write, a Windows server program can observe only the
+\texttt{SubscribedClientsChanged} event, i.e.\ how many clients are
+subscribed, not the \texttt{0x0002} value itself. The evidence for the write
+is therefore the combination of two independent observations: the Pi reads the
+descriptor back as \texttt{0x0002}, and the laptop's server log records the
+subscription. The indicate-only property is what ties a subscription to the
+value \texttt{0x0002}.
+
+\subsection{Results}
+
+With \texttt{server.py} running on the laptop, \texttt{central.py} found the
+device, wrote the descriptor, and read back the value \texttt{0x0002}. The
+laptop's log showed a subscription at the moment of the write:
+
+\begin{lstlisting}[style=shellstyle,caption={Laptop log during one run of the central.}]
+Advertising service 0000fff0-0000-1000-8000-00805f9b34fb. Ctrl+C to stop.
+[15:48:11] CCCD changed on 0000fff1-...: 1 subscribed client(s)
+[15:48:13] CCCD changed on 0000fff1-...: 0 subscribed client(s)
+\end{lstlisting}
+
+The second line is \emph{not} a second write. It is the cleanup that occurs
+when the Pi disconnects in the \texttt{finally} block: a CCCD subscription does
+not survive the connection, so the server sees the subscriber count return to
+zero. The two timestamps therefore show subscribe at the write and unsubscribe
+at the disconnect.
+
+% =========================================================================
+\section{Problems Encountered}
+
+Most of the time in this lab was spent not on the CCCD logic itself but on
+getting a working BLE environment. The causes are listed because each one
+produces a misleading symptom.
+
+\begin{table}[h]
+\centering
+\caption{Problems, their symptoms and causes.}
+\begin{tabular}{@{}p{3.2cm}p{4.8cm}p{5.8cm}@{}}
+\toprule
+Problem & Symptom & Cause and fix \\
+\midrule
+\texttt{pip install} refused &
+  \texttt{externally-managed-environment} &
+  Debian 13 enforces PEP~668. Use a venv and run it with
+  \texttt{sudo} by absolute path. \\
+Scan finds nothing, \texttt{scanend ... Rejected} &
+  \texttt{bluepy} raised \texttt{BTLEManagementError} after the scan; empty
+  device list; \texttt{bluetoothctl} said \texttt{NotReady} &
+  Bluetooth was \emph{soft-blocked} (\texttt{rfkill list}). Fixed with
+  \texttt{rfkill unblock bluetooth} and \texttt{hciconfig hci0 up}. The error
+  message pointed at \texttt{bluepy}, but the library was not at fault. \\
+\texttt{bless} fails on Windows &
+  \texttt{No module named bleak\_winrt}, then \texttt{pysetupdi} &
+  Unmaintained dependencies. Replaced by direct WinRT calls. \\
+Laptop invisible to the Pi &
+  Filter on AD type~7 found nothing &
+  The UUID is in AD type~3. A raw dump of all scan fields exposed it. \\
+Address kept changing &
+  A stored MAC no longer matched &
+  Random advertising addresses rotate; select by service UUID instead. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The soft-blocked adapter was the most instructive case. Two unrelated tools,
+\texttt{bluepy} and \texttt{bluetoothctl}, failed with different messages, and
+only the lower-level \texttt{rfkill} state explained both. When a stack of
+libraries reports an error, the fault should be looked for at the lowest layer
+first.
+
+% =========================================================================
+\section{Option Problem 1: BLE in C with GATTLIB}
+
+\subsection{Building GATTLIB}
+
+GATTLIB was cloned from \url{https://github.com/labapart/gattlib} and built
+with CMake on the Pi. CMake selected the D-Bus backend for BlueZ~5.82. The
+build initially failed at configuration time, in the examples only, with
+\texttt{None of the required 'libpcre' found}.
+
+The cause is that the examples' \texttt{CMakeLists.txt} files request the
+PCRE1 library (\texttt{libpcre}), while Debian 13 no longer ships
+\texttt{libpcre3-dev} (\texttt{apt-cache policy} reported no candidate).
+PCRE2 (\texttt{libpcre2-dev}) was already installed as a dependency of GLib.
+Before changing anything, a search of the C sources showed that none of the
+GATTLIB code actually calls the PCRE API; only the CMake files link it. The
+one-word change in eight files, from \texttt{libpcre} to \texttt{libpcre2-8},
+was therefore enough:
+
+\begin{lstlisting}[style=shellstyle,caption={Build steps, including the PCRE workaround.}]
+sudo apt install git cmake build-essential libbluetooth-dev libreadline-dev
+git clone https://github.com/labapart/gattlib.git && cd gattlib
+grep -rl "REQUIRED libpcre)" --include=CMakeLists.txt . \
+  | xargs sed -i 's/REQUIRED libpcre)/REQUIRED libpcre2-8)/'
+mkdir build && cd build && cmake .. && make
+sudo make install
+\end{lstlisting}
+
+The build and installation completed. The examples were run from the
+\texttt{build} directory. The compiler emitted warnings (transposed
+\texttt{calloc} arguments, an unused variable) from the library's own code
+under gcc~14, which do not affect the result.
+
+\subsection{Trying the examples}
+
+\paragraph{\texttt{ble\_scan}.} This example scans and then attempts to
+connect to \emph{every} device it found, listing each one's GATT services. In
+a room with several dozen random-address devices most connections fail, for
+example with \texttt{Timeout was reached} or
+\texttt{le-connection-abort-by-local}. These failures are expected rather than
+a fault in the setup: the devices are other people's phones, trackers and
+peripherals that do not accept a connection from a stranger. One device did
+accept and its services (\texttt{0x1800}, \texttt{0x1801}, \texttt{0x180A},
+\texttt{0x180F} and several vendor-specific UUIDs) were listed, which
+demonstrates that scanning, connecting and service discovery all work. The
+program also terminated with a segmentation fault when it attempted to connect
+to a network printer. This crash was observed but not investigated; it occurs
+in the example's failed-connection path, not in the code written for this lab.
+
+When the output was piped to \texttt{tee} for logging, the log initially came
+out empty. This is standard C buffering: when standard output is a pipe it is
+block-buffered, and the process was interrupted with Ctrl+C before the buffer
+was flushed. Running it through \texttt{stdbuf -oL} (line-buffered) and
+redirecting standard error into the same pipe fixed it.
+
+\paragraph{\texttt{discover}.} Aimed at the laptop running
+\texttt{server.py}, \texttt{discover} listed the laptop's complete GATT
+table, which includes many built-in Windows services, and ended with the
+characteristic written by \texttt{server.py}:
+
+\begin{lstlisting}[style=shellstyle,caption={The last line of \texttt{discover}'s output.}]
+characteristic[36] properties:20 value_handle:0068 uuid:0xfff1
+\end{lstlisting}
+
+The property byte \texttt{0x20} is the GATT \emph{Indicate} bit, which
+matches how \texttt{server.py} defined the characteristic, so GATTLIB read the
+true table from the laptop. The \texttt{read\_write} and \texttt{notification}
+examples need a readable characteristic and a Battery service respectively, and
+neither exists on the test peripheral.
+
+% =========================================================================
+\section{Conclusion}
+
+A Python BLE central was written that scans, selects its peripheral by
+advertised service, connects, writes \texttt{0x0002} to a CCCD with a write
+request, reads the value back and disconnects cleanly. It was tested against a
+purpose-written GATT server on a Windows laptop instead of an Android phone.
+The principal limitation of that choice is that Windows hides the raw CCCD
+value from the server application, which is why the evidence combines the
+Pi's read-back with the server's subscription event.
+
+In the optional part, GATTLIB was built on a Debian~13 system for which its
+documented dependencies are partly out of date, and two of its examples were
+used to scan and to enumerate the services of a device under test.
+
+Beyond the CCCD itself, the main lesson was how much of BLE programming is
+about the environment: soft-blocked radios, address types and rotating
+addresses, byte order, and libraries that have not kept pace with the
+operating system. Each of those produced a symptom far from its cause, and each
+was solved by testing the layer below the one that reported the error.
+
+\end{document}
