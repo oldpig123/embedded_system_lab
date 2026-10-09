@@ -2,9 +2,10 @@
 
 ## Overview
 The STM32 B-L475E-IOT01A board acts as a **BLE GATT server** (peripheral) and a Raspberry Pi acts as a **GATT client** (central).
-The board exposes a custom accelerometer service with two characteristics:
+The board exposes a custom accelerometer service with three characteristics:
 - **(a) 3-axis acceleration**: real LSM6DSL data, pushed to the Pi with notifications
 - **(b) sampling frequency**: the Pi writes it to set how often the board samples and notifies
+- **(c) significant motion event** (Option 1(b)): notified when the LSM6DSL detects significant motion
 
 The firmware runs on FreeRTOS (CMSIS-RTOS v2) with two tasks, `TASK_BLE` and `TASK_ACC`.
 
@@ -20,17 +21,18 @@ The board advertises with the complete local name **`ES_HENG`**.
 | Accelerometer service | `0a38e701-0511-49c1-ba27-5ffb911242a4` | Primary | — |
 | (a) Acceleration XYZ | `0a38e702-0511-49c1-ba27-5ffb911242a4` | Notify | 6 bytes: `int16` X, Y, Z in **mg**, little-endian |
 | (b) Sampling frequency | `0a38e703-0511-49c1-ba27-5ffb911242a4` | Write, Write Without Response | 1 byte: `uint8` frequency in **Hz** (default 2 Hz) |
+| (c) Significant motion | `0a38e704-0511-49c1-ba27-5ffb911242a4` | Notify | 1 byte: `0x01` when an event occurs |
 
 Example notification payload with the board lying flat: `03 00 FE FF E8 03` → X = 3, Y = -2, Z = 1000 mg.
 
-The service reserves 6 attribute records: the service declaration, 3 for characteristic (a) (declaration, value, CCCD), and 2 for characteristic (b) (declaration, value).
+The service reserves 9 attribute records: the service declaration, 3 for characteristic (a) (declaration, value, CCCD), 2 for characteristic (b) (declaration, value), and 3 for characteristic (c) (declaration, value, CCCD).
 
 #### RTOS tasks
 
 | Task | Priority | Stack | Responsibility |
 |------|----------|-------|----------------|
 | `TASK_BLE` | Normal | 1024 words | Restarts advertising when `set_connectable` is set (at boot and after each disconnection). Calls `hci_user_evt_proc()` every 5 ms to dispatch BlueNRG events: GAP connection complete, GAP disconnection complete, and GATT attribute modified (the write to characteristic (b)). |
-| `TASK_ACC` | AboveNormal | 512 words | Reads the LSM6DSL over I2C2, converts the raw values to mg, and calls `aci_gatt_update_char_value()` on characteristic (a) while a client is connected. Sleeps `1000 / acc_freq_hz` ms between samples. |
+| `TASK_ACC` | AboveNormal | 512 words | Reads the LSM6DSL over I2C2, converts the raw values to mg, and calls `aci_gatt_update_char_value()` on characteristic (a) while a client is connected. Waits up to `1000 / acc_freq_hz` ms between samples with `osThreadFlagsWait`; wakes early when the significant motion EXTI sets thread flag `0x01`, then reads `FUNC_SRC1` and notifies characteristic (c). |
 
 - **`bleMutex`**: both tasks send HCI commands to the BlueNRG-MS over SPI3. The HCI layer (`hci_send_req`) waits for the command-complete event on a single global event queue. If one task preempted the other, it could consume the reply meant for the other task's command, so every BlueNRG call is wrapped in `osMutexAcquire` / `osMutexRelease`.
 - **`acc_freq_hz`**: written in `TASK_BLE` (from the attribute-modified event) and read in `TASK_ACC`. It is a `volatile uint8_t`. A single-byte load/store is atomic on the Cortex-M4, so no lock is needed.
@@ -40,6 +42,16 @@ The LSM6DSL is accessed by reading and writing registers directly through `HAL_I
 - `CTRL3_C = 0x44`: block data update + register address auto-increment
 - `CTRL1_XL = 0x40`: ODR 104 Hz, ±2 g full scale (0.061 mg/LSB)
 - Each sample reads 6 bytes starting at `OUTX_L_XL` (`0x28`)
+
+### Option 1(b): Significant motion detection
+The LSM6DSL's embedded significant motion function (pedometer based; fires after `SM_THS` = 6 steps by default, needs ODR ≥ 26 Hz) is routed to its INT1 pin, which is wired to **PD11 (EXTI11)** on the board.
+- `CTRL10_C (0x19) = 0x05`: `FUNC_EN` + `SIGN_MOTION_EN`
+- `INT1_CTRL (0x0D) = 0x40`: `INT1_SIGN_MOT`, route the event to INT1
+- `FUNC_SRC1 (0x53)` bit 6 `SIGN_MOTION_IA`: confirms the event; read once at init and after each interrupt to clear it
+
+Flow: INT1 rising edge → `EXTI15_10_IRQHandler` → `HAL_GPIO_EXTI_Callback` calls `osThreadFlagsSet(TASK_ACCHandle, 0x01)` → `TASK_ACC` wakes from `osThreadFlagsWait`, reads `FUNC_SRC1` over I2C2, and if bit 6 is set and a client is connected, notifies characteristic (c) under `bleMutex`.
+The ISR only sets a flag because I2C reads and BlueNRG HCI commands block and use the mutex, which is not allowed in interrupt context. The event is handled in `TASK_ACC` because it is the only task that uses I2C2.
+`osThreadFlagsWait` returns `osFlagsErrorTimeout` (`0xFFFFFFFE`) on timeout, whose bit 0 is also 1, so the code checks that bit 31 is 0 before testing bit 0.
 
 
 ## Build Instructions
@@ -83,13 +95,17 @@ sudo .venv/bin/python rpi/central.py       # keep the current frequency (2 Hz af
 The script:
 1. scans for 5 s and selects the device named `ES_HENG`
 2. connects and looks up the service and both characteristics by UUID
-3. enables notifications by writing `01 00` to the CCCD of characteristic (a)
+3. enables notifications by writing `01 00` to the CCCDs of characteristics (a) and (c)
 4. if a frequency argument is given, writes it as 1 byte to characteristic (b)
-5. prints the decoded X / Y / Z values (mg) for 60 seconds, then disconnects
+5. for 60 seconds, prints the decoded X / Y / Z values (mg) for 6-byte notifications and `Significant motion detected` for 1-byte notifications, then disconnects
 
 Expected output with the board lying flat, at 10 Hz (about 10 lines per second):
 ```
 Notification from handle 0x00xx: X=3, Y=-2, Z=1000
+```
+To trigger significant motion, hold the board and move it up and down like walking (about one step per second, 6+ steps):
+```
+Notification from handle 0x00xx: Significant motion detected
 ```
 
 If the board is not found, check that it is advertising with `bluetoothctl --timeout 15 scan le`.
@@ -98,14 +114,14 @@ If the board is not found, check that it is advertising with `bluetoothctl --tim
 ```
 lab4/
   STM32/Lab4/                     # Complete STM32CubeIDE project (CubeMX: Lab4.ioc)
-    Core/Src/main.c               # FreeRTOS tasks TASK_BLE / TASK_ACC, LSM6DSL register access
+    Core/Src/main.c               # FreeRTOS tasks TASK_BLE / TASK_ACC, LSM6DSL register access, EXTI callback
     Core/Src/acc_service.c        # Custom GATT service: creation, notify, write handler
     Core/Inc/acc_service.h
     BlueNRG_MS/App/app_bluenrg_ms.c  # BLE init: GAP device name, calls Add_Acc_Service()
     BlueNRG_MS/App/sensor.c       # HCI event dispatch (adds the attribute-modified case)
     BlueNRG_MS/App/sensor.h       # Advertised name ES_HENG
   rpi/
-    central.py                    # bluepy GATT client: subscribe to XYZ, write frequency
+    central.py                    # bluepy GATT client: subscribe to XYZ and motion, write frequency
 ```
 
 ### Changes relative to the CubeMX SensorDemo template
@@ -113,8 +129,8 @@ lab4/
 | File | Change |
 |------|--------|
 | `Lab4.ioc` | FreeRTOS (CMSIS_V2) enabled; tasks `TASK_BLE` and `TASK_ACC`; mutex `bleMutex`; TIM6 as the HAL timebase |
-| `Core/Src/acc_service.c/.h` | New files. `Add_Acc_Service()`, `Acc_Service_Notify()`, `Acc_Service_Attr_Modified()`, `acc_freq_hz` |
-| `Core/Src/main.c` | Task bodies. `TASK_BLE` replaces `MX_BlueNRG_MS_Process()` to drop SensorDemo's simulated data and its blocking `HAL_Delay(1000)` |
+| `Core/Src/acc_service.c/.h` | New files. `Add_Acc_Service()`, `Acc_Service_Notify()`, `Acc_Service_Motion_Notify()`, `Acc_Service_Attr_Modified()`, `acc_freq_hz` |
+| `Core/Src/main.c` | Task bodies and `HAL_GPIO_EXTI_Callback` (PD11 → thread flag). `TASK_BLE` replaces `MX_BlueNRG_MS_Process()` to drop SensorDemo's simulated data and its blocking `HAL_Delay(1000)` |
 | `BlueNRG_MS/App/app_bluenrg_ms.c` | Inside `USER CODE` sections: set GAP device name, call `Add_Acc_Service()` |
 | `BlueNRG_MS/App/sensor.c` | Dispatch `EVT_BLUE_GATT_ATTRIBUTE_MODIFIED` to `Acc_Service_Attr_Modified()` |
 | `BlueNRG_MS/App/sensor.h` | `SENSOR_DEMO_NAME` changed to `ES_HENG` |

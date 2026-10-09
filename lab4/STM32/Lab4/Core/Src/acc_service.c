@@ -19,10 +19,12 @@ do {\
 #define COPY_ACC_SERVICE_UUID(uuid_struct) COPY_UUID_128(uuid_struct,0x0a,0x38,0xe7,0x01,0x05,0x11,0x49,0xc1,0xba,0x27,0x5f,0xfb,0x91,0x12,0x42,0xa4)
 #define COPY_ACC_XYZ_CHAR_UUID(uuid_struct) COPY_UUID_128(uuid_struct,0x0a,0x38,0xe7,0x02,0x05,0x11,0x49,0xc1,0xba,0x27,0x5f,0xfb,0x91,0x12,0x42,0xa4)
 #define COPY_ACC_FREQ_CHAR_UUID(uuid_struct) COPY_UUID_128(uuid_struct,0x0a,0x38,0xe7,0x03,0x05,0x11,0x49,0xc1,0xba,0x27,0x5f,0xfb,0x91,0x12,0x42,0xa4)
+#define COPY_ACC_MOTION_CHAR_UUID(uuid_struct) COPY_UUID_128(uuid_struct,0x0a,0x38,0xe7,0x04,0x05,0x11,0x49,0xc1,0xba,0x27,0x5f,0xfb,0x91,0x12,0x42,0xa4)
 
 uint16_t accServHandle;
 uint16_t accCharHandle;
 uint16_t freqCharHandle;
+uint16_t motionCharHandle;
 volatile uint8_t acc_freq_hz = 2;
 
 tBleStatus Add_Acc_Service(void) {
@@ -30,7 +32,7 @@ tBleStatus Add_Acc_Service(void) {
 	uint8_t uuid[16];
 
 	COPY_ACC_SERVICE_UUID(uuid);
-	ret = aci_gatt_add_serv(UUID_TYPE_128, uuid, PRIMARY_SERVICE, 6, &accServHandle);
+	ret = aci_gatt_add_serv(UUID_TYPE_128, uuid, PRIMARY_SERVICE, 9, &accServHandle);
 	if (ret != BLE_STATUS_SUCCESS) {
 		return ret;
 	}
@@ -47,12 +49,23 @@ tBleStatus Add_Acc_Service(void) {
 		return ret;
 	}
 
+	COPY_ACC_MOTION_CHAR_UUID(uuid);
+	ret = aci_gatt_add_char(accServHandle, UUID_TYPE_128, uuid, 1, CHAR_PROP_NOTIFY, ATTR_PERMISSION_NONE, GATT_DONT_NOTIFY_EVENTS, 16, CHAR_VALUE_LEN_CONSTANT, &motionCharHandle);
+	if (ret != BLE_STATUS_SUCCESS) {
+		return ret;
+	}
+
 	return BLE_STATUS_SUCCESS;
 }
 
 
 tBleStatus Acc_Service_Notify(const int16_t xyz[3]) {
 	return aci_gatt_update_char_value(accServHandle, accCharHandle, 0, 6, xyz);
+}
+
+tBleStatus Acc_Service_Motion_Notify(void) {
+	uint8_t motion = 0x01;
+	return aci_gatt_update_char_value(accServHandle, motionCharHandle, 0, 1, &motion);
 }
 
 void Acc_Service_Attr_Modified(uint16_t attr_handle, uint8_t data_length, const uint8_t *att_data) {

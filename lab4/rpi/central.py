@@ -17,8 +17,11 @@ class NotificationDelegate(DefaultDelegate):
     def __init__(self):
         DefaultDelegate.__init__(self)
     def handleNotification(self, cHandle, data):
-        x, y, z = struct.unpack('<hhh', data)
-        print(f"Notification from handle 0x{cHandle:04X}: X={x}, Y={y}, Z={z}")
+        if len(data) == 6:
+            x, y, z = struct.unpack('<hhh', data)
+            print(f"Notification from handle 0x{cHandle:04X}: X={x}, Y={y}, Z={z}")
+        elif len(data) == 1:
+            print(f"Notification from handle 0x{cHandle:04X}: Significant motion detected")
 
 # 1. Scan for BLE devices and pick the one advertising the name ES_HENG
 scanner = Scanner().withDelegate(ScanDelegate())
@@ -46,25 +49,40 @@ try:
     target_service = peripheral_device.getServiceByUUID(UUID("0a38e701-0511-49c1-ba27-5ffb911242a4"))
     acc_char = target_service.getCharacteristics(UUID("0a38e702-0511-49c1-ba27-5ffb911242a4"))
     freq_char = target_service.getCharacteristics(UUID("0a38e703-0511-49c1-ba27-5ffb911242a4"))
+    motion_char = target_service.getCharacteristics(UUID("0a38e704-0511-49c1-ba27-5ffb911242a4"))
     if len(acc_char) == 0:
         print("Characteristic with UUID 0a38e702-0511-49c1-ba27-5ffb911242a4 not found.")
         sys.exit(1)
     if len(freq_char) == 0:
         print("Characteristic with UUID 0a38e703-0511-49c1-ba27-5ffb911242a4 not found.")
         sys.exit(1)
+    if len(motion_char) == 0:
+        print("Characteristic with UUID 0a38e704-0511-49c1-ba27-5ffb911242a4 not found.")
+        sys.exit(1)
 
     acc_char = acc_char[0]
     freq_char = freq_char[0]
-    target_cccd = acc_char.getDescriptors(forUUID=0x2902)
-    if len(target_cccd) == 0:
+    motion_char = motion_char[0]
+
+    acc_cccd = acc_char.getDescriptors(forUUID=0x2902)
+    if len(acc_cccd) == 0:
         print("CCCD descriptor not found for the XYZ characteristic.")
         sys.exit(1)
-    target_cccd = target_cccd[0]
-    print("Found XYZ characteristic and its CCCD descriptor: handle 0x%04X, uuid %s" % (target_cccd.handle, target_cccd.uuid))
+    acc_cccd = acc_cccd[0]
+    print("Found XYZ characteristic and its CCCD descriptor: handle 0x%04X, uuid %s" % (acc_cccd.handle, acc_cccd.uuid))
+
+    motion_cccd = motion_char.getDescriptors(forUUID=0x2902)
+    if len(motion_cccd) == 0:
+        print("CCCD descriptor not found for the motion characteristic.")
+        sys.exit(1)
+    motion_cccd = motion_cccd[0]
+    print("Found motion characteristic and its CCCD descriptor: handle 0x%04X, uuid %s" % (motion_cccd.handle, motion_cccd.uuid))
 
     # 4. Enable notifications (CCCD = 0x0001)
-    print("CCCD value before writing: 0x%04X" % int.from_bytes(target_cccd.read(), 'little'))
-    target_cccd.write(b'\x01\x00', withResponse=True)
+    print("CCCD value before writing: 0x%04X" % int.from_bytes(acc_cccd.read(), 'little'))
+    acc_cccd.write(b'\x01\x00', withResponse=True)
+    print("CCCD value after writing: 0x%04X" % int.from_bytes(acc_cccd.read(), 'little'))
+    motion_cccd.write(b'\x01\x00', withResponse=True)
 
     # 5. Optionally set the sampling frequency in Hz (python central.py <freq>)
     if len(sys.argv) > 1:

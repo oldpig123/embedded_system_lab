@@ -40,6 +40,9 @@
 #define CTRL1_XL_ADDR 0x10
 #define CTRL3_C_ADDR 0x12
 #define OUTX_L_XL_ADDR 0x28
+#define CTRL10_C_ADDR 0x19
+#define INT1_CTRL_ADDR 0x0D
+#define FUNC_SRC1_ADDR 0x53
 
 /* USER CODE END PD */
 
@@ -79,7 +82,6 @@ const osMutexAttr_t bleMutex_attributes = {
   .name = "bleMutex"
 };
 /* USER CODE BEGIN PV */
-volatile uint32_t test_v = 0;
 volatile int16_t acc_mg[3];
 volatile uint8_t who_am_i;
 volatile uint8_t i2c_status;
@@ -638,7 +640,11 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if (GPIO_Pin == LSM6DSL_INT1_EXTI11_Pin) {
+		osThreadFlagsSet(TASK_ACCHandle, 0x01);
+	}
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartTaskBLE */
@@ -689,6 +695,15 @@ void StartTaskACC(void *argument)
   val = 0x40;
   i2c_status = HAL_I2C_Mem_Write(&hi2c2, DEVICE_ADDR, CTRL1_XL_ADDR, I2C_MEMADD_SIZE_8BIT, &val, 1, 100);
 
+  // activate significant motion
+  val = 0x05;
+  i2c_status = HAL_I2C_Mem_Write(&hi2c2, DEVICE_ADDR, CTRL10_C_ADDR, I2C_MEMADD_SIZE_8BIT, &val, 1, 100);
+
+  val = 0x40;
+  i2c_status = HAL_I2C_Mem_Write(&hi2c2, DEVICE_ADDR, INT1_CTRL_ADDR, I2C_MEMADD_SIZE_8BIT, &val, 1, 100);
+
+  i2c_status = HAL_I2C_Mem_Read(&hi2c2, DEVICE_ADDR, FUNC_SRC1_ADDR, I2C_MEMADD_SIZE_8BIT, &val, 1, 100);
+
   /* Infinite loop */
   uint8_t buff[6];
   for(;;)
@@ -700,11 +715,22 @@ void StartTaskACC(void *argument)
 	if (connected) {
 		int16_t acc_buf[3] = {acc_mg[0], acc_mg[1], acc_mg[2]};
 		osMutexAcquire(bleMutexHandle, osWaitForever);
+		// acc notify
 		notify_status = Acc_Service_Notify(acc_buf);
 		osMutexRelease(bleMutexHandle);
 	}
-	test_v += 1;
-    osDelay(1000 / acc_freq_hz);
+
+	uint32_t ret = osThreadFlagsWait(0x01, osFlagsWaitAny, 1000 / acc_freq_hz);
+
+	// motion notify
+	if ((ret & 0x80000000U) == 0 && (ret & 0x01) == 1) {
+		i2c_status = HAL_I2C_Mem_Read(&hi2c2, DEVICE_ADDR, FUNC_SRC1_ADDR, I2C_MEMADD_SIZE_8BIT, &val, 1, 100);
+		if (connected && (val & 0x40)) {
+			osMutexAcquire(bleMutexHandle, osWaitForever);
+			notify_status = Acc_Service_Motion_Notify();
+			osMutexRelease(bleMutexHandle);
+		}
+	}
   }
   /* USER CODE END StartTaskACC */
 }
